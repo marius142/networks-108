@@ -5,8 +5,7 @@ SERVER_PORT = 5378
 separator_token = "<SEP>"
 
 client_name = ''
-client_book = []
-client_sockets = []
+client_book = {}
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 # make the port as reusable port
@@ -28,30 +27,30 @@ def listen_for_client(cl):
             if "-FROM" in msg:
                 msg = msg.replace("-FROM", '')
                 client_name = msg.split(' ')[1]
-                client_book.append(client_name)
+                client_book[client_name] = cl
+                print(client_book)
             elif "WHO" in msg:
                 msg = "WHO-OK"
                 msg += ''.join(client_book)
             elif "SEND" in msg:
                 cl.send(("SEND-OK").encode())
-                recipient = msg.split(' ')[1]
-                recipient_no = client_book.index(recipient)
-                cl = client_sockets[recipient_no]
-                msg = msg.replace("SEND", "DELIVERY")
+                client_name = msg.split(' ')[1]
+                client_book[client_name].send("DELIVERY " + msg.split(' ')[2])
+
+                
 
             cl.send(msg.encode())
 
         except Exception as e:
             # client no longer connected, remove it from the set
             print(f"[!] Error: {e}")
-            client_sockets.remove(cl)
+            client_book.pop(client_name)
 
 while True:
     # we keep listening for new connections all the time
     client, client_address = sock.accept()
     print(f"[+] {client_address} connected.")
     # add the new connected client to connected sockets
-    client_sockets.append(client)
 
     threading.Thread(target=listen_for_client, args={client,}, daemon = True).start()
 
