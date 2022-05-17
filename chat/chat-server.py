@@ -1,12 +1,13 @@
 import socket, threading
 
-SERVER_HOST = "127.0.0.1"
+SERVER_HOST = "192.168.0.104"
 SERVER_PORT = 5378
 separator_token = "<SEP>"
 
 client_name = ''
 client_book = {}
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+active_connections = {sock}
 
 # make the port as reusable port
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -15,29 +16,38 @@ sock.listen(5)
 print(f"[*] Listening as {SERVER_HOST}:{SERVER_PORT}")
 
 def listen_for_client(cl):
+    sender = ''
     while True:
         try:
-            recipient = ''
-            recipient_no = 0
-            recipient_addr = ''
             # keep listening for a message from `cl` socket
             msg = cl.recv(1024).decode()
             msg = msg.replace(separator_token, ": ")
 
             if "-FROM" in msg:
-                msg = msg.replace("-FROM", '')
                 client_name = msg.split(' ')[1]
-                client_book[client_name] = cl
-                print(client_book)
+                if client_name in client_book:
+                    msg = "IN-USE\n"
+                else:
+                    msg = msg.replace("-FROM", '')
+                    client_name = client_name.replace('\n', '')
+                    sender = client_name
+                    client_book[client_name] = cl
             elif "WHO" in msg:
                 msg = "WHO-OK"
-                msg += ''.join(client_book)
+                for key in client_book:
+                    msg += key + ", "
+                msg = msg[:-2]
+                msg += "\n"
             elif "SEND" in msg:
-                cl.send(("SEND-OK").encode())
                 client_name = msg.split(' ')[1]
-                client_book[client_name].send("DELIVERY " + msg.split(' ')[2])
-
-                
+                #SEND client_name msg
+                #DELIVERY client_name msg
+                if client_name in client_book:
+                    recipient = client_book[client_name]
+                    recipient.send(("DELIVERY" + sender + ": " + msg.split(' ')[2] + '\n').encode())
+                    msg = "SEND-OK\n"
+                else:
+                    msg = "UNKNOWN\n"
 
             cl.send(msg.encode())
 
@@ -50,7 +60,11 @@ while True:
     # we keep listening for new connections all the time
     client, client_address = sock.accept()
     print(f"[+] {client_address} connected.")
-    # add the new connected client to connected sockets
+    # add the client to the active connections listen
+    active_connections.add(client)
+
+    if len(active_connections) > 2:
+        client.send(("BUSY\n").encode())
 
     threading.Thread(target=listen_for_client, args={client,}, daemon = True).start()
 

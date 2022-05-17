@@ -1,6 +1,6 @@
 import socket, threading, os, sys
 
-SERVER_TARGET = 'localhost'
+SERVER_TARGET = '192.168.0.104'
 SERVER_PORT = 5378
 
 def listen(connection: socket.socket):
@@ -22,14 +22,16 @@ def listen(connection: socket.socket):
 					elif "UNKNOWN" in buf:
 						buf = "User offline.\n"
 					elif "DELIVERY" in buf:
-						buf = buf.replace("DELIVERY", "From:\n")
+						buf = buf.replace("DELIVERY", '')
 					elif "IN-USE" in buf:
-						buf = 'Please try again.\n'
+						buf = 'Name in use, please try again\n'
 						print(buf)
 						sys.stdout.flush()
 						os.execl(sys.executable, sys.executable, *sys.argv)
 					elif "BUSY" in buf:
-						buf = "Maximum number of clients has been reached."
+						buf = 'Reached maximum number of clients.\n\tPlease try again later.'
+						print(buf)
+						os._exit(0)
 					elif "BAD-RQST-HDR" in buf:
 						buf = 'Last message contains an error in header.'
 					elif "BAD-RQST-BODY" in buf:
